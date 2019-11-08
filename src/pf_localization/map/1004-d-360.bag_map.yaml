@@ -1,0 +1,6 @@
+image: /home/nrsl/data/1004-d-360.bag_map.pgm
+resolution: 0.05
+origin: [-104.15, -24.45, 0.0]
+negate: 0
+occupied_thresh: 0.65
+free_thresh: 0.196
