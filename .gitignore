@@ -1,6 +1,8 @@
 build
 devel
-.catin*
-src/.idea
+.catkin_workspacesrc
+.idea
 src/cmake-*
 src/CMakeLists.txt
+src/pf_localization/data
+
