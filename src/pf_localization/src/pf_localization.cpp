@@ -79,58 +79,29 @@ void PFLocalization::pointsCallback(const sensor_msgs::PointCloud2ConstPtr &msg)
     obs_cloud->sensorLabel = "3D Lidar";
     CSensoryFrame::Ptr observations = std::make_shared<CSensoryFrame>(); // 每次重新初始化
     observations->insert(obs_cloud); // insert CObservation
-
-    unique_lock<mutex> lock(odom_mutex_);
-    if (!odom_received_) {
-        printf("Still not received odometry topic!");
-        return;
-    }
-
-    CPose3D odo_incr = CPose3D(pending_most_recent_odo_ - last_used_abs_odo_);
-    last_used_abs_odo_ = pending_most_recent_odo_;
-    CActionRobotMovement3D act_odom3d;
-    act_odom3d.timestamp = fromROS(msg->header.stamp);
-    act_odom3d.computeFromOdometry(odo_incr, param_.actOdom3dParams_);
     CActionCollection::Ptr action = std::make_shared<CActionCollection>(); //每次重新初始化
-    action->insert(act_odom3d);
+    {
+        unique_lock<mutex> lock(odom_mutex_);
+        if (!odom_received_) {
+            printf("Still not received odometry topic!");
+            return;
+        }
 
-    printf("odom inc: %f %f %f\n", odo_incr.x(), odo_incr.y(), odo_incr.yaw());
-
-    // save sensor data into queue
-    sensor_data_.push_back(SensorData(dynamic_cast<CSensoryFrame *>(observations->clone()), dynamic_cast<CActionCollection *>(action->clone())));
-}
-
-void PFLocalization::odometryCallback(const nav_msgs::OdometryConstPtr &msg) {
-    unique_lock<mutex> lock(odom_mutex_);
-    pending_most_recent_odo_ = fromROS(msg->pose.pose);
-
-    if (!odom_received_) {
-        odom_received_ = true;
+        CPose3D odo_incr = CPose3D(pending_most_recent_odo_ - last_used_abs_odo_);
         last_used_abs_odo_ = pending_most_recent_odo_;
-    }
-}
+        CActionRobotMovement3D act_odom3d;
+        act_odom3d.timestamp = fromROS(msg->header.stamp);
+        act_odom3d.computeFromOdometry(odo_incr, param_.actOdom3dParams_);
+        action->insert(act_odom3d);
 
-void PFLocalization::run() {
-    // get sensor data
-    if (sensor_data_.empty()) {
-        printf("There is no sensor data\n");
-        return;
+        printf("odom inc: %f %f %f\n", odo_incr.x(), odo_incr.y(), odo_incr.yaw());
     }
-    auto data = sensor_data_.front();
-    sensor_data_.pop_front();
-    CSensoryFrame::Ptr obs = std::make_shared<CSensoryFrame>();
-    CActionCollection::Ptr act = std::make_shared<CActionCollection>();
-    obs = data.first;
-    act = data.second;
-    printf("size: obs %d, act %d\n", static_cast<int>(obs->size()), static_cast<int>(act->size()));
-    if (static_cast<int>(obs->size()) == 0 || static_cast<int>(act->size()) == 0) {
-        return;
-    }
+
 
     // execute pf
     tictac_.Tic();
-    printf("Execute PF, data size: %d\n", static_cast<int>(sensor_data_.size()));
-    pf_.executeOn(pdf_, act.get(), obs.get(), &pf_stats_);
+    printf("Execute PF\n");
+    pf_.executeOn(pdf_, action.get(), observations.get(), &pf_stats_);
 
     // get run time
     double run_time = tictac_.Tac();
@@ -183,6 +154,20 @@ void PFLocalization::run() {
         }
         pub_pose_.publish(p);
     }
+}
+
+void PFLocalization::odometryCallback(const nav_msgs::OdometryConstPtr &msg) {
+    unique_lock<mutex> lock(odom_mutex_);
+    pending_most_recent_odo_ = fromROS(msg->pose.pose);
+
+    if (!odom_received_) {
+        odom_received_ = true;
+        last_used_abs_odo_ = pending_most_recent_odo_;
+    }
+}
+
+void PFLocalization::run() {
+
 
 }
 }//namespace end

@@ -61,8 +61,6 @@ private:
 
 
 private:
-    using SensorData = std::pair<CSensoryFrame::Ptr , CActionCollection::Ptr>;
-
     // pf params
     Parameters param_;
 
@@ -87,9 +85,6 @@ private:
     CPose2D odometry_estimation_;
     mutex odom_mutex_;
     bool odom_received_ = false;
-
-
-    std::deque<SensorData> sensor_data_;
 };
 
 }
